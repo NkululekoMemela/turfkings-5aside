@@ -16,7 +16,7 @@ export const TEAMS = [
     {
       id: "team-nk",
       label: "Barcelona",
-      captain: "Nkululeko",
+      captain: "NK",
       players: ["Nkululeko", "Zizou", "Dayaan", "Dr Babs", "Kolobe", "Anathi"],
     },
   ];
