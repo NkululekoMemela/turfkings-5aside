@@ -3,19 +3,19 @@
 export const TEAMS = [
     {
       id: "team-enoch",
-      label: "Team-Enoch",
+      label: "Liverpool",
       captain: "Enoch",
       players: ["Enoch", "Uhone", "Mark", "Barlo", "Nkumbuzo", "Munya"],
     },
     {
       id: "team-mdu",
-      label: "Team-Mdu",
+      label: "Madrid",
       captain: "Mdu",
       players: ["Mdu", "Scott", "Chad", "Taku", "Josh", "Humbu"],
     },
     {
       id: "team-nk",
-      label: "Team-NK",
+      label: "Barcelona",
       captain: "Nkululeko",
       players: ["Nkululeko", "Zizou", "Dayaan", "Dr Babs", "Kolobe", "Anathi"],
     },

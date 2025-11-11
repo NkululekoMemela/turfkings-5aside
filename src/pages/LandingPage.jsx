@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { getTeamById } from "../core/teams.js";
 
-const CAPTAIN_CODES = ["11", "22", "33"]; // any captain can approve pairing override
+const CAPTAIN_CODES = ["11", "22", "3333"]; // any captain can approve pairing override
 
 export function LandingPage({
   teams,
