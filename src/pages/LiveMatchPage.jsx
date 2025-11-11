@@ -3,8 +3,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { getTeamById } from "../core/teams.js";
 
-const MATCH_SECONDS = 5 * 60; // 5 minutes
+const MATCH_SECONDS = 1 * 10; // 5 minutes : 5 * 60
 const CAPTAIN_CODES = ["11", "22", "3333"];
+
+// Single audio instance for full-time whistle / alarm.
+// Put alarm.mp3 inside public/ so it is served as /alarm.mp3
+const matchEndSound =
+  typeof Audio !== "undefined" ? new Audio("/alarm.mp4") : null;
 
 export function LiveMatchPage({
   teams,
@@ -51,11 +56,26 @@ export function LiveMatchPage({
         if (prev <= 1) {
           setTimeUp(true);
           setRunning(false);
+
+          // 🔔 Play alarm / whistle when time is up
+          if (matchEndSound) {
+            try {
+              matchEndSound.currentTime = 0;
+              matchEndSound.play().catch(() => {
+                // Ignore autoplay errors (e.g. if user hasn't interacted yet)
+              });
+            } catch (e) {
+              // swallow any unexpected audio errors
+            }
+          }
+
+          // Existing alert as backup visual cue
           if (typeof window !== "undefined") {
             try {
               window.alert("Time is up! Please end the match.");
             } catch (e) {}
           }
+
           return 0;
         }
         return prev - 1;
