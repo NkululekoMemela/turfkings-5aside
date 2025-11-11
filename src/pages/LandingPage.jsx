@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { getTeamById } from "../core/teams.js";
+import TurfKingsLogo from "../assets/TurfKings_logo.jpg";
 
 const CAPTAIN_CODES = ["11", "22", "3333"]; // any captain can approve pairing override
 
@@ -115,9 +116,17 @@ export function LandingPage({
   return (
     <div className="page landing-page">
       <header className="header">
-        <h1>Turf Kings 5-A-Side</h1>
+        <div className="header-title">
+          <img
+            src={TurfKingsLogo}
+            alt="Turf Kings logo"
+            className="tk-logo"
+          />
+          <h1>Turf Kings 5-A-Side</h1>
+        </div>
         <p className="subtitle">Grand Central – 17:30–19:00</p>
       </header>
+
 
       <section className="card">
         <h2>Upcoming Match #{currentMatchNo}</h2>
@@ -199,10 +208,7 @@ export function LandingPage({
               <button className="secondary-btn" onClick={cancelPairingChange}>
                 Cancel
               </button>
-              <button
-                className="primary-btn"
-                onClick={confirmPairingChange}
-              >
+              <button className="primary-btn" onClick={confirmPairingChange}>
                 Confirm change
               </button>
             </div>
@@ -212,4 +218,3 @@ export function LandingPage({
     </div>
   );
 }
-

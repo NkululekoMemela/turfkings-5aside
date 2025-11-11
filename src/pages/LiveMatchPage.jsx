@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { getTeamById } from "../core/teams.js";
 
 const MATCH_SECONDS = 5 * 60; // 5 minutes
-const CAPTAIN_CODES = ["11", "22", "33"];
+const CAPTAIN_CODES = ["11", "22", "3333"];
 
 export function LiveMatchPage({
   teams,

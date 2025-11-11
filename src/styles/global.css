@@ -158,9 +158,26 @@
   .score-team strong,
   .standby-label strong,
   .header p strong {
-    font-size: 1.05rem;
+    font-size: 0.85rem;
   }
   
+/* Logo + title row on landing page */
+.header-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    justify-content: flex-start; /* or center if you prefer */
+  }
+  
+  /* Force small thumbnail logo */
+  .header .tk-logo {
+    width: 40px !important;   /* try 40–60px depending on taste */
+    height: 40px !important;
+    border-radius: 999px;     /* circular logo, optional */
+    object-fit: contain;
+  }
+  
+
   /* Misc text */
   
   .vs-label {
