@@ -208,6 +208,18 @@ export function LandingPage({
         />
       </section>
 
+      {/* 👇 Add this new website link button */}
+      <div className="website-link">
+        <a
+          href="https://nkululeko-memela0205.github.io/packetcodeofficial.github.io/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="website-btn"
+        >
+          🌍 Visit Our Website
+        </a>
+      </div>
+
       {showPairingModal && (
         <div className="modal-backdrop">
           <div className="modal">

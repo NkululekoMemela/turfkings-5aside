@@ -194,16 +194,38 @@
     display: flex;
     justify-content: center;   /* center horizontally */
     margin: 0 1rem 1.5rem;     /* left/right + bottom spacing */
-    max-width: 900px;        /* match whatever your .card uses */
+    max-width: 1200px;        /* match whatever your .card uses */
   }
   
   .team-photo-img {
     width: 100vw;      /* full viewport width */
     max-width: 100%;            /* don’t touch screen edges */
-    max-height: 360px;         /* adjust up/down to taste */
+    max-height: 390px;         /* adjust up/down to taste */
     border-radius: 2px;
     object-fit: cover;
   }
+
+  .website-link {
+    display: flex;
+    justify-content: center;
+    margin: 1.5rem 0 2rem;
+  }
+  
+  .website-btn {
+    background-color: #05213f;   /* bright blue */
+    color: white;
+    text-decoration: none;
+    font-weight: 600;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    transition: background-color 0.3s;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.2);
+  }
+  
+  .website-btn:hover {
+    background-color: #0056b3;
+  }
+  
   
   
   /* Moving content inside the ticker */
