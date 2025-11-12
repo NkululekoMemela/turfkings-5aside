@@ -185,7 +185,24 @@
     background: rgba(0, 0, 0, 0.25);
     border-radius: 999px;
     padding: 0.35rem 0.75rem;
+
+    margin-top: 1rem;
+    margin-bottom: 1.5rem; /* 👈 space below the ribbon */
   }
+
+  .team-photo {
+    display: flex;
+    justify-content: center;   /* center horizontally */
+    margin: 0 1rem 1.5rem;     /* left/right + bottom spacing */
+  }
+  
+  .team-photo-img {
+    max-width: 100%;            /* don’t touch screen edges */
+    max-height: 260px;         /* adjust up/down to taste */
+    border-radius: 2px;
+    object-fit: cover;
+  }
+  
   
   /* Moving content inside the ticker */
   .ticker-inner {

@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { getTeamById } from "../core/teams.js";
 import TurfKingsLogo from "../assets/TurfKings_logo.jpg";
+import TurfKingsTeam from "../assets/TurfKings.jpg"; // 👈 new import
 
 const CAPTAIN_CODES = ["11", "22", "3333"]; // any captain can approve pairing override
 
@@ -51,7 +52,7 @@ export function LandingPage({
     ribbonText += " \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0  •  No results yet – first game incoming!";
   }
 
-  // 🔥 New: Top scorer segment (if available in streaks)
+  // Top scorer segment (if available)
   const topScorer = streaks?.topScorer;
   if (topScorer) {
     const topScorerName = topScorer.name || topScorer.playerName;
@@ -196,6 +197,15 @@ export function LandingPage({
         <div className="ticker-inner">
           <span>{ribbonText}</span>
         </div>
+      </section>
+
+      {/* 👇 New team picture section */}
+      <section className="team-photo">
+        <img
+          src={TurfKingsTeam}
+          alt="Turf Kings squad"
+          className="team-photo-img"
+        />
       </section>
 
       {showPairingModal && (
