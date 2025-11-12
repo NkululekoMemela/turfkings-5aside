@@ -6,8 +6,7 @@ import { getTeamById } from "../core/teams.js";
 const MATCH_SECONDS = 1 * 10; // 5 minutes : 5 * 60
 const CAPTAIN_CODES = ["11", "22", "3333"];
 
-// Single audio instance for full-time whistle / alarm.
-// Put alarm.mp3 inside public/ so it is served as /alarm.mp3
+// Full-time whistle / alarm sound (mp4 lives in public/)
 const matchEndSound =
   typeof Audio !== "undefined" ? new Audio("/alarm.mp4") : null;
 
@@ -62,14 +61,14 @@ export function LiveMatchPage({
             try {
               matchEndSound.currentTime = 0;
               matchEndSound.play().catch(() => {
-                // Ignore autoplay errors (e.g. if user hasn't interacted yet)
+                // ignore autoplay errors
               });
             } catch (e) {
-              // swallow any unexpected audio errors
+              // ignore audio errors
             }
           }
 
-          // Existing alert as backup visual cue
+          // Visual backup
           if (typeof window !== "undefined") {
             try {
               window.alert("Time is up! Please end the match.");
@@ -114,6 +113,7 @@ export function LiveMatchPage({
       id: Date.now().toString(),
       type: eventType, // "goal" or "shibobo"
       teamId: scoringTeamId,
+      // For shibobo we still use `scorer` field to hold the player name
       scorer: scorerName,
       assist: eventType === "goal" && assistName ? assistName : null,
       timeSeconds: MATCH_SECONDS - secondsLeft,
@@ -276,46 +276,63 @@ export function LiveMatchPage({
             </button>
           </div>
 
-          <div className="field-row">
-            <label>Scorer</label>
-            <select
-              value={scorerName}
-              onChange={(e) => {
-                setScorerName(e.target.value);
-                if (e.target.value === assistName) {
-                  setAssistName("");
-                }
-              }}
-            >
-              <option value="">Select scorer</option>
-              {playersForSelectedTeam.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* 🔁 Goal vs Shibobo player selection */}
+          {eventType === "goal" ? (
+            <>
+              <div className="field-row">
+                <label>Scorer</label>
+                <select
+                  value={scorerName}
+                  onChange={(e) => {
+                    setScorerName(e.target.value);
+                    if (e.target.value === assistName) {
+                      setAssistName("");
+                    }
+                  }}
+                >
+                  <option value="">Select scorer</option>
+                  {playersForSelectedTeam.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="field-row">
-            <label>Assist (optional)</label>
-            <select
-              value={assistName}
-              onChange={(e) => setAssistName(e.target.value)}
-              disabled={eventType === "shibobo"}
-            >
-              <option value="">
-                {eventType === "shibobo"
-                  ? "Assist not used for shibobo"
-                  : "No assist"}
-              </option>
-              {eventType === "goal" &&
-                assistOptions.map((p) => (
+              <div className="field-row">
+                <label>Assist (optional)</label>
+                <select
+                  value={assistName}
+                  onChange={(e) => setAssistName(e.target.value)}
+                >
+                  <option value="">No assist</option>
+                  {assistOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </>
+          ) : (
+            <div className="field-row">
+              <label>Player</label>
+              <select
+                value={scorerName}
+                onChange={(e) => {
+                  setScorerName(e.target.value);
+                  setAssistName("");
+                }}
+              >
+                <option value="">Select player</option>
+                {playersForSelectedTeam.map((p) => (
                   <option key={p} value={p}>
                     {p}
                   </option>
                 ))}
-            </select>
-          </div>
+              </select>
+            </div>
+          )}
 
           <button className="primary-btn" onClick={handleAddEvent}>
             Add Event

@@ -32,8 +32,10 @@ export function LandingPage({
   const matchesPlayed = results.length;
   const lastResult = matchesPlayed > 0 ? results[matchesPlayed - 1] : null;
 
-  let ribbonText = `Next: ${teamA.label} vs ${teamB.label}  |  Standby: ${standbyTeam.label}`;
+  // Base ribbon text
+  let ribbonText = `Next: ${teamA.label} vs ${teamB.label}  |    \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0     Standby: ${standbyTeam.label}`;
 
+  // Last result segment
   if (lastResult) {
     const lastA = getTeamById(teams, lastResult.teamAId);
     const lastB = getTeamById(teams, lastResult.teamBId);
@@ -44,9 +46,20 @@ export function LandingPage({
             lastResult.winnerId === lastA.id ? lastA.label : lastB.label
           }`;
 
-    ribbonText += `  •  Last: ${lastA.label} ${lastResult.goalsA}-${lastResult.goalsB} ${lastB.label} (${status})`;
+    ribbonText += ` \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0  •  Last: ${lastA.label} ${lastResult.goalsA}-${lastResult.goalsB} ${lastB.label} (${status})`;
   } else {
-    ribbonText += "  •  No results yet – first game incoming!";
+    ribbonText += " \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0  •  No results yet – first game incoming!";
+  }
+
+  // 🔥 New: Top scorer segment (if available in streaks)
+  const topScorer = streaks?.topScorer;
+  if (topScorer) {
+    const topScorerName = topScorer.name || topScorer.playerName;
+    const topScorerGoals = topScorer.goals;
+
+    if (topScorerName && topScorerGoals != null) {
+      ribbonText += ` \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0  •  Top scorer: ${topScorerName} (${topScorerGoals} goals)`;
+    }
   }
 
   const requestPairChange = (candidateMatch) => {
@@ -126,7 +139,6 @@ export function LandingPage({
         </div>
         <p className="subtitle">Grand Central – 17:30–19:00</p>
       </header>
-
 
       <section className="card">
         <h2>Upcoming Match #{currentMatchNo}</h2>
