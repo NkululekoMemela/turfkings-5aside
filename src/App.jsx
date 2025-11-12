@@ -22,6 +22,9 @@ export default function App() {
   const [page, setPage] = useState(PAGE_LANDING);
   const [state, setState] = useState(() => loadState());
 
+  // ⭐ NEW: Track where Stats was opened from
+  const [statsOrigin, setStatsOrigin] = useState(PAGE_LANDING);
+
   // backup / clear modal
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [backupCode, setBackupCode] = useState("");
@@ -53,7 +56,9 @@ export default function App() {
     setPage(PAGE_LIVE);
   };
 
-  const handleGoToStats = () => {
+  // ⭐ UPDATED: Stats now knows where it was opened from
+  const handleGoToStats = (origin = PAGE_LANDING) => {
+    setStatsOrigin(origin);
     setPage(PAGE_STATS);
   };
 
@@ -63,6 +68,15 @@ export default function App() {
 
   const handleBackToLanding = () => {
     setPage(PAGE_LANDING);
+  };
+
+  // ⭐ NEW: Back from Stats returns to correct place
+  const handleBackFromStats = () => {
+    if (statsOrigin === PAGE_LIVE) {
+      setPage(PAGE_LIVE); // go back to LiveMatchPage safely
+    } else {
+      setPage(PAGE_LANDING);
+    }
   };
 
   // Live match handlers
@@ -138,7 +152,7 @@ export default function App() {
     setPage(PAGE_LANDING);
   };
 
-  // Squad updates (only Nkululeko should be giving the code – enforced in SquadsPage)
+  // Squad updates
   const handleUpdateTeams = (updatedTeams) => {
     setState((prev) => ({
       ...prev,
@@ -211,7 +225,7 @@ export default function App() {
           streaks={streaks}
           onUpdatePairing={handleUpdatePairing}
           onStartMatch={handleStartMatch}
-          onGoToStats={handleGoToStats}
+          onGoToStats={() => handleGoToStats(PAGE_LANDING)} // ⭐ UPDATED
           onGoToSquads={handleGoToSquads}
           onOpenBackupModal={openBackupModal}
         />
@@ -228,7 +242,7 @@ export default function App() {
           onUndoLastEvent={handleUndoLastEvent}
           onConfirmEndMatch={handleConfirmEndMatch}
           onBackToLanding={handleBackToLanding}
-          onGoToStats={handleGoToStats}
+          onGoToStats={() => handleGoToStats(PAGE_LIVE)} // ⭐ UPDATED
         />
       )}
 
@@ -237,7 +251,7 @@ export default function App() {
           teams={teams}
           results={results}
           allEvents={allEvents}
-          onBack={handleBackToLanding}
+          onBack={handleBackFromStats} // ⭐ UPDATED
         />
       )}
 

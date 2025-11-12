@@ -1,14 +1,21 @@
 // src/pages/LiveMatchPage.jsx
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { getTeamById } from "../core/teams.js";
 
 const MATCH_SECONDS = 1 * 10; // 5 minutes : 5 * 60
 const CAPTAIN_CODES = ["11", "22", "3333"];
 
-// Full-time whistle / alarm sound (mp4 lives in public/)
-const matchEndSound =
-  typeof Audio !== "undefined" ? new Audio("/alarm.mp4") : null;
+// ✅ Correct URL for GitHub Pages subpath (and dev)
+const SOUND_URL = `${import.meta.env.BASE_URL}alarm.mp4`;
+
+// ✅ Create one Audio instance and configure it
+const matchEndSound = typeof Audio !== "undefined" ? new Audio(SOUND_URL) : null;
+if (matchEndSound) {
+  matchEndSound.preload = "auto";
+  matchEndSound.loop = false;
+  matchEndSound.volume = 1;
+}
 
 export function LiveMatchPage({
   teams,
@@ -39,13 +46,52 @@ export function LiveMatchPage({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmCountdown, setConfirmCountdown] = useState(15);
 
-  // delete confirmation
+  // delete confirmation (for events)
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteIndex, setDeleteIndex] = useState(null);
   const [deleteCode, setDeleteCode] = useState("");
   const [deleteError, setDeleteError] = useState("");
 
-  // Timer
+  // 🔁 keep interval id to repeat whistle until match is ended
+  const alarmLoopRef = useRef(null);
+
+  // ❗ Back-protection modal
+  const [showBackModal, setShowBackModal] = useState(false);
+  const [backCode, setBackCode] = useState("");
+  const [backError, setBackError] = useState("");
+
+  // ✅ NEW: Undo-last confirmation (with captain code)
+  const [showUndoModal, setShowUndoModal] = useState(false);
+  const [undoCode, setUndoCode] = useState("");
+  const [undoError, setUndoError] = useState("");
+
+  // ✅ Mobile autoplay fix: unlock audio on first user interaction
+  useEffect(() => {
+    if (!matchEndSound) return;
+    const unlock = async () => {
+      try {
+        await matchEndSound.play();
+        matchEndSound.pause();
+        matchEndSound.currentTime = 0;
+      } catch (_) {
+        /* ignore */
+      } finally {
+        window.removeEventListener("pointerdown", unlock);
+        window.removeEventListener("touchstart", unlock);
+        window.removeEventListener("click", unlock);
+      }
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("touchstart", unlock, { once: true });
+    window.addEventListener("click", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("touchstart", unlock);
+      window.removeEventListener("click", unlock);
+    };
+  }, []);
+
+  // Main timer
   useEffect(() => {
     if (!running) return;
     if (secondsLeft <= 0) return;
@@ -56,24 +102,21 @@ export function LiveMatchPage({
           setTimeUp(true);
           setRunning(false);
 
-          // 🔔 Play alarm / whistle when time is up
-          if (matchEndSound) {
+          // 🔔 Play alarm once when time is up
+          (async () => {
             try {
-              matchEndSound.currentTime = 0;
-              matchEndSound.play().catch(() => {
-                // ignore autoplay errors
-              });
-            } catch (e) {
-              // ignore audio errors
-            }
-          }
+              if (matchEndSound) {
+                matchEndSound.currentTime = 0;
+                await matchEndSound.play();
+              }
+              if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            } catch (_) {}
+          })();
 
           // Visual backup
-          if (typeof window !== "undefined") {
-            try {
-              window.alert("Time is up! Please end the match.");
-            } catch (e) {}
-          }
+          try {
+            window.alert("Time is up! Please end the match.");
+          } catch (_) {}
 
           return 0;
         }
@@ -84,10 +127,36 @@ export function LiveMatchPage({
     return () => clearInterval(id);
   }, [running, secondsLeft]);
 
+  // 🔁 After timeUp, repeat whistle + vibration every 10s until match is ended
+  useEffect(() => {
+    if (!timeUp) {
+      if (alarmLoopRef.current) {
+        clearInterval(alarmLoopRef.current);
+        alarmLoopRef.current = null;
+      }
+      return;
+    }
+
+    alarmLoopRef.current = setInterval(async () => {
+      try {
+        if (matchEndSound) {
+          matchEndSound.currentTime = 0;
+          await matchEndSound.play();
+        }
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      } catch (_) {}
+    }, 10000);
+
+    return () => {
+      if (alarmLoopRef.current) {
+        clearInterval(alarmLoopRef.current);
+        alarmLoopRef.current = null;
+      }
+    };
+  }, [timeUp]);
+
   const formattedTime = useMemo(() => {
-    const m = Math.floor(secondsLeft / 60)
-      .toString()
-      .padStart(2, "0");
+    const m = Math.floor(secondsLeft / 60).toString().padStart(2, "0");
     const s = (secondsLeft % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
   }, [secondsLeft]);
@@ -102,9 +171,7 @@ export function LiveMatchPage({
   const playersForSelectedTeam =
     scoringTeamId === teamAId ? teamA.players : teamB.players;
 
-  const assistOptions = playersForSelectedTeam.filter(
-    (p) => p !== scorerName
-  );
+  const assistOptions = playersForSelectedTeam.filter((p) => p !== scorerName);
 
   const handleAddEvent = () => {
     if (!scorerName) return;
@@ -148,15 +215,15 @@ export function LiveMatchPage({
   };
 
   const handleConfirmFinal = () => {
+    // 🛑 stop repeating alarm if running
+    if (alarmLoopRef.current) {
+      clearInterval(alarmLoopRef.current);
+      alarmLoopRef.current = null;
+    }
+
     setShowConfirmModal(false);
     setConfirmCountdown(15);
-    const summary = {
-      teamAId,
-      teamBId,
-      standbyId,
-      goalsA,
-      goalsB,
-    };
+    const summary = { teamAId, teamBId, standbyId, goalsA, goalsB };
     onConfirmEndMatch(summary);
   };
 
@@ -187,6 +254,74 @@ export function LiveMatchPage({
     handleCancelDelete();
   };
 
+  // =========================
+  //   Safe Back behaviour
+  // =========================
+  const hasProgress = currentEvents.length > 0 || secondsLeft < MATCH_SECONDS;
+
+  const handleBackClick = () => {
+    if (!hasProgress) {
+      onBackToLanding(); // safe: no progress
+      return;
+    }
+    // Protect with modal + captain code
+    setBackCode("");
+    setBackError("");
+    setShowBackModal(true);
+  };
+
+  const handleCancelBack = () => {
+    setShowBackModal(false);
+    setBackCode("");
+    setBackError("");
+  };
+
+  const handleConfirmDiscardAndBack = () => {
+    const code = backCode.trim();
+    if (!CAPTAIN_CODES.includes(code)) {
+      setBackError("Invalid captain code.");
+      return;
+    }
+
+    // stop alarm loop if any
+    if (alarmLoopRef.current) {
+      clearInterval(alarmLoopRef.current);
+      alarmLoopRef.current = null;
+    }
+
+    setShowBackModal(false);
+    setBackCode("");
+    setBackError("");
+    onBackToLanding(); // discard and go back
+  };
+
+  // =========================
+  //   NEW: Undo-last modal
+  // =========================
+  const openUndoModal = () => {
+    setUndoCode("");
+    setUndoError("");
+    setShowUndoModal(true);
+  };
+
+  const cancelUndo = () => {
+    setShowUndoModal(false);
+    setUndoCode("");
+    setUndoError("");
+  };
+
+  const confirmUndo = () => {
+    const code = undoCode.trim();
+    if (!CAPTAIN_CODES.includes(code)) {
+      setUndoError("Invalid captain code.");
+      return;
+    }
+    setShowUndoModal(false);
+    setUndoCode("");
+    setUndoError("");
+    onUndoLastEvent(); // 🔁 actually perform the undo
+  };
+
   return (
     <div className="page live-page">
       <header className="header">
@@ -207,6 +342,19 @@ export function LiveMatchPage({
           {timeUp && (
             <span className="timer-warning">Time is up – end match!</span>
           )}
+
+          {/* Safer Back */}
+          <button
+            className={hasProgress ? "danger-btn" : "secondary-btn"}
+            onClick={handleBackClick}
+            title={
+              hasProgress
+                ? "Cancel this match (captain code required)"
+                : "Go back to fix teams"
+            }
+          >
+            {hasProgress ? "Cancel Match" : "Change Teams"}
+          </button>
         </div>
 
         <div className="score-row">
@@ -342,13 +490,12 @@ export function LiveMatchPage({
         <div className="event-log">
           <div className="event-log-header">
             <h3>Current Match Events</h3>
-            <button className="secondary-btn" onClick={onUndoLastEvent}>
+            {/* 🔒 Undo requires captain code now */}
+            <button className="secondary-btn" onClick={openUndoModal}>
               Undo last
             </button>
           </div>
-          {currentEvents.length === 0 && (
-            <p className="muted">No events yet.</p>
-          )}
+          {currentEvents.length === 0 && <p className="muted">No events yet.</p>}
           <ul>
             {currentEvents.map((e, idx) => {
               const team =
@@ -376,9 +523,6 @@ export function LiveMatchPage({
         </div>
 
         <div className="actions-row">
-          <button className="secondary-btn" onClick={onBackToLanding}>
-            Back
-          </button>
           <button className="secondary-btn" onClick={onGoToStats}>
             View Stats
           </button>
@@ -407,6 +551,38 @@ export function LiveMatchPage({
               </button>
               <button className="primary-btn" onClick={handleConfirmFinal}>
                 Confirm &amp; lock
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Undo last confirm modal */}
+      {showUndoModal && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h3>Undo last event?</h3>
+            <p>Enter a captain code to confirm.</p>
+            <div className="field-row">
+              <label>Captain code</label>
+              <input
+                type="password"
+                className="text-input"
+                value={undoCode}
+                onChange={(e) => {
+                  setUndoCode(e.target.value);
+                  setUndoError("");
+                }}
+                maxLength={4}
+              />
+              {undoError && <p className="error-text">{undoError}</p>}
+            </div>
+            <div className="actions-row">
+              <button className="secondary-btn" onClick={cancelUndo}>
+                Cancel
+              </button>
+              <button className="primary-btn" onClick={confirmUndo}>
+                Confirm undo
               </button>
             </div>
           </div>
@@ -444,14 +620,47 @@ export function LiveMatchPage({
           </div>
         </div>
       )}
+
+      {/* Back confirm modal (discard match) */}
+      {showBackModal && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h3>Cancel this match?</h3>
+            <p>
+              You have started this match or logged events. To change teams you
+              must <strong>discard</strong> the current match progress.
+            </p>
+            <div className="field-row">
+              <label>Captain code</label>
+              <input
+                type="password"
+                className="text-input"
+                value={backCode}
+                onChange={(e) => {
+                  setBackCode(e.target.value);
+                  setBackError("");
+                }}
+                maxLength={4}
+              />
+              {backError && <p className="error-text">{backError}</p>}
+            </div>
+            <div className="actions-row">
+              <button className="secondary-btn" onClick={handleCancelBack}>
+                Keep editing
+              </button>
+              <button className="danger-btn" onClick={handleConfirmDiscardAndBack}>
+                Discard &amp; go back
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 function formatSeconds(s) {
-  const m = Math.floor(s / 60)
-    .toString()
-    .padStart(2, "0");
+  const m = Math.floor(s / 60).toString().padStart(2, "0");
   const sec = (s % 60).toString().padStart(2, "0");
   return `${m}:${sec}`;
 }
