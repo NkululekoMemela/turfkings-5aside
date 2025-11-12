@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { getTeamById } from "../core/teams.js";
 
-const MATCH_SECONDS = 1 * 10; // 5 minutes : 5 * 60
+const MATCH_SECONDS = 5 * 60; // 5 minutes : 5 * 60
 const CAPTAIN_CODES = ["11", "22", "3333"];
 
 // ✅ Correct URL for GitHub Pages subpath (and dev)
