@@ -194,11 +194,13 @@
     display: flex;
     justify-content: center;   /* center horizontally */
     margin: 0 1rem 1.5rem;     /* left/right + bottom spacing */
+    max-width: 900px;        /* match whatever your .card uses */
   }
   
   .team-photo-img {
+    width: 100vw;      /* full viewport width */
     max-width: 100%;            /* don’t touch screen edges */
-    max-height: 260px;         /* adjust up/down to taste */
+    max-height: 360px;         /* adjust up/down to taste */
     border-radius: 2px;
     object-fit: cover;
   }
