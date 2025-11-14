@@ -123,23 +123,25 @@ export function StatsPage({ teams, results, allEvents, cameFromLive, onBack }) {
       }
     });
 
-    // attach team name if available
+    // attach team name + total if available
     Object.values(stats).forEach((p) => {
       p.teamName = playerTeamMap[p.name] || "—";
+      p.total = p.goals + p.assists + p.shibobos; // 👈 combined total
     });
 
     return Object.values(stats);
   }, [allEvents, playerTeamMap]);
 
-  // Combined player rankings (main table: goals + assists + shibobos)
+  // Combined player rankings (main table: total = goals + assists + shibobos)
   const combinedLeaderboard = useMemo(() => {
     const arr = playerStats
-      .filter((p) => p.goals > 0 || p.assists > 0 || p.shibobos > 0)
+      .filter((p) => (p.total || 0) > 0)
       .slice();
     arr.sort((x, y) => {
-      if (y.goals !== x.goals) return y.goals - x.goals;
-      if (y.assists !== x.assists) return y.assists - x.assists;
-      if (y.shibobos !== x.shibobos) return y.shibobos - x.shibobos;
+      if (y.total !== x.total) return y.total - x.total;       // sort by total first
+      if (y.goals !== x.goals) return y.goals - x.goals;       // then goals
+      if (y.assists !== x.assists) return y.assists - x.assists; // then assists
+      if (y.shibobos !== x.shibobos) return y.shibobos - x.shibobos; // then shibobos
       return x.name.localeCompare(y.name);
     });
     return arr;
@@ -248,7 +250,7 @@ export function StatsPage({ teams, results, allEvents, cameFromLive, onBack }) {
 
   // ---------- TABS: which table is visible ----------
   // options: "matches", "combined", "goals", "assists", "teams"
-  const [activeTab, setActiveTab] = useState("combined");
+  const [activeTab, setActiveTab] = useState("teams"); // default to Team Standings
 
   // ---------- RENDER ----------
   return (
@@ -264,7 +266,7 @@ export function StatsPage({ teams, results, allEvents, cameFromLive, onBack }) {
       <section className="card">
         <h2>View</h2>
         <div className="actions-row stats-tabs">
-          {/* Match Results FIRST, aligned with Combined */}
+          {/* Team Standings + Match Results (left side) */}
           <button
             className={
               activeTab === "teams" ? "secondary-btn active" : "secondary-btn"
@@ -282,8 +284,7 @@ export function StatsPage({ teams, results, allEvents, cameFromLive, onBack }) {
             Match Results
           </button>
 
-
-          {/* Rest of buttons kept as they were, more to the right */}
+          {/* Rest of buttons */}
           <button
             className={
               activeTab === "goals" ? "secondary-btn active" : "secondary-btn"
@@ -355,7 +356,7 @@ export function StatsPage({ teams, results, allEvents, cameFromLive, onBack }) {
       {/* MAIN COMBINED PLAYER TABLE */}
       {activeTab === "combined" && (
         <section className="card">
-          <h2>Player Rankings (Goals + Assists + Shibobos)</h2>
+          <h2>Player Rankings (Total = Goals + Assists + Shibobo)</h2>
           <div className="table-wrapper">
             <table className="stats-table">
               <thead>
@@ -365,13 +366,14 @@ export function StatsPage({ teams, results, allEvents, cameFromLive, onBack }) {
                   <th>Team</th>
                   <th>Goals</th>
                   <th>Assists</th>
-                  <th>Shibobos</th>
+                  <th>Shibobo</th>
+                  <th>G-A-S</th>
                 </tr>
               </thead>
               <tbody>
                 {combinedLeaderboard.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="muted">
+                    <td colSpan={7} className="muted">
                       No player stats recorded yet.
                     </td>
                   </tr>
@@ -384,6 +386,7 @@ export function StatsPage({ teams, results, allEvents, cameFromLive, onBack }) {
                     <td>{p.goals}</td>
                     <td>{p.assists}</td>
                     <td>{p.shibobos}</td>
+                    <td>{p.total}</td>
                   </tr>
                 ))}
               </tbody>

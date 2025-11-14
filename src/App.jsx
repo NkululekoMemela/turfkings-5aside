@@ -303,7 +303,9 @@ export default function App() {
           allEvents={allEvents}
           cameFromLive={statsReturnPage === PAGE_LIVE}
           onBack={() =>
-            statsReturnPage === PAGE_LIVE ? handleBackToLive() : handleBackToLanding()
+            statsReturnPage === PAGE_LIVE
+              ? handleBackToLive()
+              : handleBackToLanding()
           }
         />
       )}
