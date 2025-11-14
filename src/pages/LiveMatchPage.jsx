@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { getTeamById } from "../core/teams.js";
 
-const MATCH_SECONDS = 5 * 60; // 5 minutes : 5 * 60
 const CAPTAIN_CODES = ["11", "22", "3333"];
 
 // ✅ Correct URL for GitHub Pages subpath (and dev)
@@ -17,7 +16,27 @@ if (matchEndSound) {
   matchEndSound.volume = 1;
 }
 
+// ✅ Helper to stop alarm + loop completely
+function stopAlarmLoop(alarmLoopRef) {
+  if (alarmLoopRef.current) {
+    clearInterval(alarmLoopRef.current);
+    alarmLoopRef.current = null;
+  }
+  if (matchEndSound) {
+    try {
+      matchEndSound.pause();
+      matchEndSound.currentTime = 0;
+    } catch (_) {
+      /* ignore */
+    }
+  }
+}
+
 export function LiveMatchPage({
+  matchSeconds,        // ⏱️ comes from App.jsx
+  secondsLeft,         // ⏱️ current seconds from App
+  timeUp,              // ⏱️ true when App timer hits 0
+  running,             // currently unused in UI, but available
   teams,
   currentMatchNo,
   currentMatch,
@@ -34,10 +53,6 @@ export function LiveMatchPage({
   const teamB = getTeamById(teams, teamBId);
   const standbyTeam = getTeamById(teams, standbyId);
 
-  const [secondsLeft, setSecondsLeft] = useState(MATCH_SECONDS);
-  const [running, setRunning] = useState(true);
-  const [timeUp, setTimeUp] = useState(false);
-
   const [eventType, setEventType] = useState("goal"); // "goal" | "shibobo"
   const [scoringTeamId, setScoringTeamId] = useState(teamAId);
   const [scorerName, setScorerName] = useState("");
@@ -52,18 +67,18 @@ export function LiveMatchPage({
   const [deleteCode, setDeleteCode] = useState("");
   const [deleteError, setDeleteError] = useState("");
 
-  // 🔁 keep interval id to repeat whistle until match is ended
-  const alarmLoopRef = useRef(null);
-
-  // ❗ Back-protection modal
+  // back button protection (discard & go Landing)
   const [showBackModal, setShowBackModal] = useState(false);
   const [backCode, setBackCode] = useState("");
   const [backError, setBackError] = useState("");
 
-  // ✅ NEW: Undo-last confirmation (with captain code)
+  // undo protection
   const [showUndoModal, setShowUndoModal] = useState(false);
   const [undoCode, setUndoCode] = useState("");
   const [undoError, setUndoError] = useState("");
+
+  // 🔁 alarm loop ref (for repeated beeps + vibration)
+  const alarmLoopRef = useRef(null);
 
   // ✅ Mobile autoplay fix: unlock audio on first user interaction
   useEffect(() => {
@@ -91,51 +106,26 @@ export function LiveMatchPage({
     };
   }, []);
 
-  // Main timer
-  useEffect(() => {
-    if (!running) return;
-    if (secondsLeft <= 0) return;
-
-    const id = setInterval(() => {
-      setSecondsLeft((prev) => {
-        if (prev <= 1) {
-          setTimeUp(true);
-          setRunning(false);
-
-          // 🔔 Play alarm once when time is up
-          (async () => {
-            try {
-              if (matchEndSound) {
-                matchEndSound.currentTime = 0;
-                await matchEndSound.play();
-              }
-              if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-            } catch (_) {}
-          })();
-
-          // Visual backup
-          try {
-            window.alert("Time is up! Please end the match.");
-          } catch (_) {}
-
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(id);
-  }, [running, secondsLeft]);
-
-  // 🔁 After timeUp, repeat whistle + vibration every 10s until match is ended
+  // 🔔 When timeUp is true (from App), play alarm and repeat every 10s
   useEffect(() => {
     if (!timeUp) {
-      if (alarmLoopRef.current) {
-        clearInterval(alarmLoopRef.current);
-        alarmLoopRef.current = null;
-      }
+      // timeUp reset -> stop everything
+      stopAlarmLoop(alarmLoopRef);
       return;
     }
+
+    // First alarm + vibration immediately
+    (async () => {
+      try {
+        if (matchEndSound) {
+          matchEndSound.currentTime = 0;
+          await matchEndSound.play();
+        }
+        if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      } catch (_) {
+        /* ignore */
+      }
+    })();
 
     alarmLoopRef.current = setInterval(async () => {
       try {
@@ -144,14 +134,13 @@ export function LiveMatchPage({
           await matchEndSound.play();
         }
         if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-      } catch (_) {}
-    }, 10000);
+      } catch (_) {
+        /* ignore */
+      }
+    }, 10000); // every 10 sec
 
     return () => {
-      if (alarmLoopRef.current) {
-        clearInterval(alarmLoopRef.current);
-        alarmLoopRef.current = null;
-      }
+      stopAlarmLoop(alarmLoopRef);
     };
   }, [timeUp]);
 
@@ -180,10 +169,9 @@ export function LiveMatchPage({
       id: Date.now().toString(),
       type: eventType, // "goal" or "shibobo"
       teamId: scoringTeamId,
-      // For shibobo we still use `scorer` field to hold the player name
-      scorer: scorerName,
+      scorer: scorerName, // shibobo also uses this
       assist: eventType === "goal" && assistName ? assistName : null,
-      timeSeconds: MATCH_SECONDS - secondsLeft,
+      timeSeconds: matchSeconds - secondsLeft,
     };
 
     onAddEvent(event);
@@ -215,15 +203,18 @@ export function LiveMatchPage({
   };
 
   const handleConfirmFinal = () => {
-    // 🛑 stop repeating alarm if running
-    if (alarmLoopRef.current) {
-      clearInterval(alarmLoopRef.current);
-      alarmLoopRef.current = null;
-    }
+    // 🛑 stop alarm immediately (sound + loop)
+    stopAlarmLoop(alarmLoopRef);
 
     setShowConfirmModal(false);
     setConfirmCountdown(15);
-    const summary = { teamAId, teamBId, standbyId, goalsA, goalsB };
+    const summary = {
+      teamAId,
+      teamBId,
+      standbyId,
+      goalsA,
+      goalsB,
+    };
     onConfirmEndMatch(summary);
   };
 
@@ -254,20 +245,11 @@ export function LiveMatchPage({
     handleCancelDelete();
   };
 
-  // =========================
-  //   Safe Back behaviour
-  // =========================
-  const hasProgress = currentEvents.length > 0 || secondsLeft < MATCH_SECONDS;
-
+  // Back button: require captain code, discard events, go Landing
   const handleBackClick = () => {
-    if (!hasProgress) {
-      onBackToLanding(); // safe: no progress
-      return;
-    }
-    // Protect with modal + captain code
+    setShowBackModal(true);
     setBackCode("");
     setBackError("");
-    setShowBackModal(true);
   };
 
   const handleCancelBack = () => {
@@ -283,11 +265,8 @@ export function LiveMatchPage({
       return;
     }
 
-    // stop alarm loop if any
-    if (alarmLoopRef.current) {
-      clearInterval(alarmLoopRef.current);
-      alarmLoopRef.current = null;
-    }
+    // 🛑 also stop any alarm if it was already ringing
+    stopAlarmLoop(alarmLoopRef);
 
     setShowBackModal(false);
     setBackCode("");
@@ -295,31 +274,30 @@ export function LiveMatchPage({
     onBackToLanding(); // discard and go back
   };
 
-  // =========================
-  //   NEW: Undo-last modal
-  // =========================
-  const openUndoModal = () => {
+  // Undo last: require captain code
+  const handleUndoClick = () => {
+    if (currentEvents.length === 0) return;
+    setShowUndoModal(true);
     setUndoCode("");
     setUndoError("");
-    setShowUndoModal(true);
   };
 
-  const cancelUndo = () => {
+  const handleCancelUndo = () => {
     setShowUndoModal(false);
     setUndoCode("");
     setUndoError("");
   };
 
-  const confirmUndo = () => {
+  const handleConfirmUndo = () => {
     const code = undoCode.trim();
     if (!CAPTAIN_CODES.includes(code)) {
       setUndoError("Invalid captain code.");
       return;
     }
+    onUndoLastEvent();
     setShowUndoModal(false);
     setUndoCode("");
     setUndoError("");
-    onUndoLastEvent(); // 🔁 actually perform the undo
   };
 
   return (
@@ -342,19 +320,6 @@ export function LiveMatchPage({
           {timeUp && (
             <span className="timer-warning">Time is up – end match!</span>
           )}
-
-          {/* Safer Back */}
-          <button
-            className={hasProgress ? "danger-btn" : "secondary-btn"}
-            onClick={handleBackClick}
-            title={
-              hasProgress
-                ? "Cancel this match (captain code required)"
-                : "Go back to fix teams"
-            }
-          >
-            {hasProgress ? "Cancel Match" : "Change Teams"}
-          </button>
         </div>
 
         <div className="score-row">
@@ -490,8 +455,7 @@ export function LiveMatchPage({
         <div className="event-log">
           <div className="event-log-header">
             <h3>Current Match Events</h3>
-            {/* 🔒 Undo requires captain code now */}
-            <button className="secondary-btn" onClick={openUndoModal}>
+            <button className="secondary-btn" onClick={handleUndoClick}>
               Undo last
             </button>
           </div>
@@ -523,6 +487,9 @@ export function LiveMatchPage({
         </div>
 
         <div className="actions-row">
+          <button className="secondary-btn" onClick={handleBackClick}>
+            Back
+          </button>
           <button className="secondary-btn" onClick={onGoToStats}>
             View Stats
           </button>
@@ -557,44 +524,12 @@ export function LiveMatchPage({
         </div>
       )}
 
-      {/* Undo last confirm modal */}
-      {showUndoModal && (
-        <div className="modal-backdrop">
-          <div className="modal">
-            <h3>Undo last event?</h3>
-            <p>Enter a captain code to confirm.</p>
-            <div className="field-row">
-              <label>Captain code</label>
-              <input
-                type="password"
-                className="text-input"
-                value={undoCode}
-                onChange={(e) => {
-                  setUndoCode(e.target.value);
-                  setUndoError("");
-                }}
-                maxLength={4}
-              />
-              {undoError && <p className="error-text">{undoError}</p>}
-            </div>
-            <div className="actions-row">
-              <button className="secondary-btn" onClick={cancelUndo}>
-                Cancel
-              </button>
-              <button className="primary-btn" onClick={confirmUndo}>
-                Confirm undo
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Delete event confirm modal */}
       {showDeleteModal && (
         <div className="modal-backdrop">
           <div className="modal">
             <h3>Confirm Delete Event</h3>
-            <p>To delete an event, enter any team captain's code.</p>
+            <p>To delete an event, enter any team captain&apos;s code.</p>
             <div className="field-row">
               <label>Captain code</label>
               <input
@@ -621,14 +556,14 @@ export function LiveMatchPage({
         </div>
       )}
 
-      {/* Back confirm modal (discard match) */}
+      {/* Back button confirm modal */}
       {showBackModal && (
         <div className="modal-backdrop">
           <div className="modal">
-            <h3>Cancel this match?</h3>
+            <h3>Discard match &amp; go back?</h3>
             <p>
-              You have started this match or logged events. To change teams you
-              must <strong>discard</strong> the current match progress.
+              This will <strong>lose all current events</strong> for this match
+              and return to the main screen.
             </p>
             <div className="field-row">
               <label>Captain code</label>
@@ -640,16 +575,51 @@ export function LiveMatchPage({
                   setBackCode(e.target.value);
                   setBackError("");
                 }}
-                maxLength={4}
+                maxLength={2}
               />
               {backError && <p className="error-text">{backError}</p>}
             </div>
             <div className="actions-row">
               <button className="secondary-btn" onClick={handleCancelBack}>
-                Keep editing
+                Cancel
               </button>
-              <button className="danger-btn" onClick={handleConfirmDiscardAndBack}>
+              <button
+                className="primary-btn"
+                onClick={handleConfirmDiscardAndBack}
+              >
                 Discard &amp; go back
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Undo last confirm modal */}
+      {showUndoModal && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h3>Undo last event?</h3>
+            <p>To undo the last event, enter any team captain&apos;s code.</p>
+            <div className="field-row">
+              <label>Captain code</label>
+              <input
+                type="password"
+                className="text-input"
+                value={undoCode}
+                onChange={(e) => {
+                  setUndoCode(e.target.value);
+                  setUndoError("");
+                }}
+                maxLength={2}
+              />
+              {undoError && <p className="error-text">{undoError}</p>}
+            </div>
+            <div className="actions-row">
+              <button className="secondary-btn" onClick={handleCancelUndo}>
+                Cancel
+              </button>
+              <button className="primary-btn" onClick={handleConfirmUndo}>
+                Confirm undo
               </button>
             </div>
           </div>

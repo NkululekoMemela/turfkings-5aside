@@ -18,12 +18,20 @@ const PAGE_SQUADS = "squads";
 
 const MASTER_CODE = "3333"; // Nkululeko admin code
 
+// ⏱️ Match duration in seconds (change here only)
+const MATCH_SECONDS = 5 * 60; // use 1 * 10 for testing
+
 export default function App() {
   const [page, setPage] = useState(PAGE_LANDING);
   const [state, setState] = useState(() => loadState());
 
-  // ⭐ NEW: Track where Stats was opened from
-  const [statsOrigin, setStatsOrigin] = useState(PAGE_LANDING);
+  // where to go back from Stats: landing or live
+  const [statsReturnPage, setStatsReturnPage] = useState(PAGE_LANDING);
+
+  // 🔁 TIMER STATE LIVES IN APP (so it survives page switches)
+  const [secondsLeft, setSecondsLeft] = useState(MATCH_SECONDS);
+  const [running, setRunning] = useState(false);
+  const [timeUp, setTimeUp] = useState(false);
 
   // backup / clear modal
   const [showBackupModal, setShowBackupModal] = useState(false);
@@ -44,7 +52,27 @@ export default function App() {
     streaks,
   } = state;
 
-  // Landing handlers
+  // 🔁 Main countdown timer – runs regardless of which "page" is showing
+  useEffect(() => {
+    if (!running) return;
+    if (secondsLeft <= 0) return;
+
+    const id = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          // hit zero
+          setRunning(false);
+          setTimeUp(true); // LiveMatchPage will react and ring alarm
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(id);
+  }, [running, secondsLeft]);
+
+  // ---------- LANDING HANDLERS ----------
   const handleUpdatePairing = (match) => {
     setState((prev) => ({
       ...prev,
@@ -53,12 +81,16 @@ export default function App() {
   };
 
   const handleStartMatch = () => {
+    // (Re)start a match
+    setSecondsLeft(MATCH_SECONDS);
+    setTimeUp(false);
+    setRunning(true);
     setPage(PAGE_LIVE);
   };
 
-  // ⭐ UPDATED: Stats now knows where it was opened from
-  const handleGoToStats = (origin = PAGE_LANDING) => {
-    setStatsOrigin(origin);
+  // Stats: remember where we came from
+  const handleGoToStats = (fromPage) => {
+    setStatsReturnPage(fromPage);
     setPage(PAGE_STATS);
   };
 
@@ -70,16 +102,11 @@ export default function App() {
     setPage(PAGE_LANDING);
   };
 
-  // ⭐ NEW: Back from Stats returns to correct place
-  const handleBackFromStats = () => {
-    if (statsOrigin === PAGE_LIVE) {
-      setPage(PAGE_LIVE); // go back to LiveMatchPage safely
-    } else {
-      setPage(PAGE_LANDING);
-    }
+  const handleBackToLive = () => {
+    setPage(PAGE_LIVE);
   };
 
-  // Live match handlers
+  // ---------- LIVE MATCH HANDLERS ----------
   const handleAddEvent = (event) => {
     setState((prev) => ({
       ...prev,
@@ -149,10 +176,29 @@ export default function App() {
       };
     });
 
+    // after match is ended, reset timer ready for next game
+    setRunning(false);
+    setTimeUp(false);
+    setSecondsLeft(MATCH_SECONDS);
+
     setPage(PAGE_LANDING);
   };
 
-  // Squad updates
+  // Discard current match (Back button from Live) and go to landing
+  const handleDiscardMatchAndBack = () => {
+    setRunning(false);
+    setTimeUp(false);
+    setSecondsLeft(MATCH_SECONDS);
+
+    setState((prev) => ({
+      ...prev,
+      currentEvents: [], // throw away in-progress events
+    }));
+
+    setPage(PAGE_LANDING);
+  };
+
+  // ---------- SQUADS ----------
   const handleUpdateTeams = (updatedTeams) => {
     setState((prev) => ({
       ...prev,
@@ -160,7 +206,7 @@ export default function App() {
     }));
   };
 
-  // Backup / clear logic
+  // ---------- BACKUP / CLEAR ----------
   const openBackupModal = () => {
     setBackupCode("");
     setBackupError("");
@@ -225,7 +271,7 @@ export default function App() {
           streaks={streaks}
           onUpdatePairing={handleUpdatePairing}
           onStartMatch={handleStartMatch}
-          onGoToStats={() => handleGoToStats(PAGE_LANDING)} // ⭐ UPDATED
+          onGoToStats={() => handleGoToStats(PAGE_LANDING)}
           onGoToSquads={handleGoToSquads}
           onOpenBackupModal={openBackupModal}
         />
@@ -233,6 +279,10 @@ export default function App() {
 
       {page === PAGE_LIVE && (
         <LiveMatchPage
+          matchSeconds={MATCH_SECONDS}
+          secondsLeft={secondsLeft}
+          timeUp={timeUp}
+          running={running}
           teams={teams}
           currentMatchNo={currentMatchNo}
           currentMatch={currentMatch}
@@ -241,8 +291,8 @@ export default function App() {
           onDeleteEvent={handleDeleteEvent}
           onUndoLastEvent={handleUndoLastEvent}
           onConfirmEndMatch={handleConfirmEndMatch}
-          onBackToLanding={handleBackToLanding}
-          onGoToStats={() => handleGoToStats(PAGE_LIVE)} // ⭐ UPDATED
+          onBackToLanding={handleDiscardMatchAndBack}
+          onGoToStats={() => handleGoToStats(PAGE_LIVE)}
         />
       )}
 
@@ -251,7 +301,10 @@ export default function App() {
           teams={teams}
           results={results}
           allEvents={allEvents}
-          onBack={handleBackFromStats} // ⭐ UPDATED
+          cameFromLive={statsReturnPage === PAGE_LIVE}
+          onBack={() =>
+            statsReturnPage === PAGE_LIVE ? handleBackToLive() : handleBackToLanding()
+          }
         />
       )}
 
