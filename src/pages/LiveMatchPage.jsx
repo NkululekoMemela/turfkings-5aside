@@ -1,6 +1,6 @@
 // src/pages/LiveMatchPage.jsx
 
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getTeamById } from "../core/teams.js";
 
 const CAPTAIN_CODES = ["11", "22", "3333"];
@@ -8,15 +8,17 @@ const CAPTAIN_CODES = ["11", "22", "3333"];
 // ✅ Correct URL for GitHub Pages subpath (and dev)
 const SOUND_URL = `${import.meta.env.BASE_URL}alarm.mp4`;
 
-// ✅ Create one Audio instance and configure it
-const matchEndSound = typeof Audio !== "undefined" ? new Audio(SOUND_URL) : null;
+// ✅ Single Audio instance
+const matchEndSound =
+  typeof Audio !== "undefined" ? new Audio(SOUND_URL) : null;
+
 if (matchEndSound) {
   matchEndSound.preload = "auto";
   matchEndSound.loop = false;
   matchEndSound.volume = 1;
 }
 
-// ✅ Helper to stop alarm + loop completely
+// ✅ Stop alarm helper
 function stopAlarmLoop(alarmLoopRef) {
   if (alarmLoopRef.current) {
     clearInterval(alarmLoopRef.current);
@@ -32,11 +34,27 @@ function stopAlarmLoop(alarmLoopRef) {
   }
 }
 
+// ✅ Short label helper for mobile score display
+function getShortName(label) {
+  if (!label) return "";
+  const map = {
+    Barcelona: "BAR",
+    Madrid: "MAD",
+    Liverpool: "LIV",
+  };
+  if (map[label]) return map[label];
+
+  // Generic fallback: first 3 non-space letters
+  const cleaned = label.replace(/team/gi, "").trim();
+  if (!cleaned) return label;
+  return cleaned.slice(0, 3).toUpperCase();
+}
+
 export function LiveMatchPage({
-  matchSeconds,        // ⏱️ comes from App.jsx
-  secondsLeft,         // ⏱️ current seconds from App
-  timeUp,              // ⏱️ true when App timer hits 0
-  running,             // currently unused in UI, but available
+  matchSeconds,   // from App.jsx
+  secondsLeft,    // from App.jsx
+  timeUp,         // from App.jsx
+  running,        // from App.jsx
   teams,
   currentMatchNo,
   currentMatch,
@@ -52,6 +70,21 @@ export function LiveMatchPage({
   const teamA = getTeamById(teams, teamAId);
   const teamB = getTeamById(teams, teamBId);
   const standbyTeam = getTeamById(teams, standbyId);
+
+  // 🔍 detect mobile for compact scoreboard labels
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth <= 480;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 480);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const [eventType, setEventType] = useState("goal"); // "goal" | "shibobo"
   const [scoringTeamId, setScoringTeamId] = useState(teamAId);
@@ -80,7 +113,7 @@ export function LiveMatchPage({
   // 🔁 alarm loop ref (for repeated beeps + vibration)
   const alarmLoopRef = useRef(null);
 
-  // ✅ Mobile autoplay fix: unlock audio on first user interaction
+  // ✅ Mobile autoplay unlock
   useEffect(() => {
     if (!matchEndSound) return;
     const unlock = async () => {
@@ -106,15 +139,15 @@ export function LiveMatchPage({
     };
   }, []);
 
-  // 🔔 When timeUp is true (from App), play alarm and repeat every 10s
+  // ⏱️ Timer is controlled in App.jsx. Here we only react to timeUp.
+  // When timeUp flips true, start alarm loop every 10s
   useEffect(() => {
     if (!timeUp) {
-      // timeUp reset -> stop everything
       stopAlarmLoop(alarmLoopRef);
       return;
     }
 
-    // First alarm + vibration immediately
+    // first alarm immediately
     (async () => {
       try {
         if (matchEndSound) {
@@ -137,7 +170,7 @@ export function LiveMatchPage({
       } catch (_) {
         /* ignore */
       }
-    }, 10000); // every 10 sec
+    }, 10000);
 
     return () => {
       stopAlarmLoop(alarmLoopRef);
@@ -145,7 +178,9 @@ export function LiveMatchPage({
   }, [timeUp]);
 
   const formattedTime = useMemo(() => {
-    const m = Math.floor(secondsLeft / 60).toString().padStart(2, "0");
+    const m = Math.floor(secondsLeft / 60)
+      .toString()
+      .padStart(2, "0");
     const s = (secondsLeft % 60).toString().padStart(2, "0");
     return `${m}:${s}`;
   }, [secondsLeft]);
@@ -169,7 +204,7 @@ export function LiveMatchPage({
       id: Date.now().toString(),
       type: eventType, // "goal" or "shibobo"
       teamId: scoringTeamId,
-      scorer: scorerName, // shibobo also uses this
+      scorer: scorerName,
       assist: eventType === "goal" && assistName ? assistName : null,
       timeSeconds: matchSeconds - secondsLeft,
     };
@@ -203,7 +238,7 @@ export function LiveMatchPage({
   };
 
   const handleConfirmFinal = () => {
-    // 🛑 stop alarm immediately (sound + loop)
+    // 🛑 stop alarm immediately
     stopAlarmLoop(alarmLoopRef);
 
     setShowConfirmModal(false);
@@ -265,13 +300,13 @@ export function LiveMatchPage({
       return;
     }
 
-    // 🛑 also stop any alarm if it was already ringing
+    // 🛑 stop any alarm
     stopAlarmLoop(alarmLoopRef);
 
     setShowBackModal(false);
     setBackCode("");
     setBackError("");
-    onBackToLanding(); // discard and go back
+    onBackToLanding();
   };
 
   // Undo last: require captain code
@@ -300,6 +335,9 @@ export function LiveMatchPage({
     setUndoError("");
   };
 
+  const displayNameA = isMobile ? getShortName(teamA.label) : teamA.label;
+  const displayNameB = isMobile ? getShortName(teamB.label) : teamB.label;
+
   return (
     <div className="page live-page">
       <header className="header">
@@ -322,14 +360,15 @@ export function LiveMatchPage({
           )}
         </div>
 
+        {/* 🔁 Compact mobile-friendly score row */}
         <div className="score-row">
           <div className="score-team">
-            <strong>{teamA.label}</strong>
+            <strong className="score-team-name">{displayNameA}</strong>
             <div className="score-number">{goalsA}</div>
           </div>
           <div className="score-dash">–</div>
           <div className="score-team">
-            <strong>{teamB.label}</strong>
+            <strong className="score-team-name">{displayNameB}</strong>
             <div className="score-number">{goalsB}</div>
           </div>
         </div>
@@ -389,7 +428,7 @@ export function LiveMatchPage({
             </button>
           </div>
 
-          {/* 🔁 Goal vs Shibobo player selection */}
+          {/* Goal vs Shibobo player selection */}
           {eventType === "goal" ? (
             <>
               <div className="field-row">
@@ -459,7 +498,9 @@ export function LiveMatchPage({
               Undo last
             </button>
           </div>
-          {currentEvents.length === 0 && <p className="muted">No events yet.</p>}
+          {currentEvents.length === 0 && (
+            <p className="muted">No events yet.</p>
+          )}
           <ul>
             {currentEvents.map((e, idx) => {
               const team =
@@ -630,7 +671,10 @@ export function LiveMatchPage({
 }
 
 function formatSeconds(s) {
-  const m = Math.floor(s / 60).toString().padStart(2, "0");
-  const sec = (s % 60).toString().padStart(2, "0");
+  const v = typeof s === "number" && !Number.isNaN(s) ? s : 0;
+  const m = Math.floor(v / 60)
+    .toString()
+    .padStart(2, "0");
+  const sec = (v % 60).toString().padStart(2, "0");
   return `${m}:${sec}`;
 }

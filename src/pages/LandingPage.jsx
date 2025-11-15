@@ -1,9 +1,9 @@
 // src/pages/LandingPage.jsx
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { getTeamById } from "../core/teams.js";
 import TurfKingsLogo from "../assets/TurfKings_logo.jpg";
-import TurfKingsTeam from "../assets/TurfKings.jpg"; // 👈 new import
+import TeamPhoto from "../assets/TurfKings.jpg";
 
 const CAPTAIN_CODES = ["11", "22", "3333"]; // any captain can approve pairing override
 
@@ -12,7 +12,7 @@ export function LandingPage({
   currentMatchNo,
   currentMatch,
   results,
-  streaks,
+  streaks,             // currently unused but kept for future
   onUpdatePairing,
   onStartMatch,
   onGoToStats,
@@ -26,6 +26,21 @@ export function LandingPage({
   const [pairingCode, setPairingCode] = useState("");
   const [pairingError, setPairingError] = useState("");
 
+  // 🔍 detect mobile for shorter option labels
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.innerWidth <= 480;
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onResize = () => {
+      setIsMobile(window.innerWidth <= 480);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   const teamA = getTeamById(teams, teamAId);
   const teamB = getTeamById(teams, teamBId);
   const standbyTeam = getTeamById(teams, standbyId);
@@ -33,10 +48,9 @@ export function LandingPage({
   const matchesPlayed = results.length;
   const lastResult = matchesPlayed > 0 ? results[matchesPlayed - 1] : null;
 
-  // Base ribbon text
-  let ribbonText = `Next: ${teamA.label} vs ${teamB.label}  |    \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0     Standby: ${standbyTeam.label}`;
+  // ---------- Ribbon text ----------
+  let ribbonText = `Next: ${teamA.label} vs ${teamB.label}  \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0  Standby: ${standbyTeam.label}`;
 
-  // Last result segment
   if (lastResult) {
     const lastA = getTeamById(teams, lastResult.teamAId);
     const lastB = getTeamById(teams, lastResult.teamBId);
@@ -47,22 +61,13 @@ export function LandingPage({
             lastResult.winnerId === lastA.id ? lastA.label : lastB.label
           }`;
 
-    ribbonText += ` \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0  •  Last: ${lastA.label} ${lastResult.goalsA}-${lastResult.goalsB} ${lastB.label} (${status})`;
+    ribbonText += `  \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 • Last: ${lastA.label} ${lastResult.goalsA}-${lastResult.goalsB} ${lastB.label} (${status})`;
   } else {
-    ribbonText += " \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0  •  No results yet – first game incoming!";
+    ribbonText +=
+      "  \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 •  No results yet – first game incoming!";
   }
 
-  // Top scorer segment (if available)
-  const topScorer = streaks?.topScorer;
-  if (topScorer) {
-    const topScorerName = topScorer.name || topScorer.playerName;
-    const topScorerGoals = topScorer.goals;
-
-    if (topScorerName && topScorerGoals != null) {
-      ribbonText += ` \u00A0\u00A0\u00A0\u00A0\u00A0\u00A0  •  Top scorer: ${topScorerName} (${topScorerGoals} goals)`;
-    }
-  }
-
+  // ---------- pairing override ----------
   const requestPairChange = (candidateMatch) => {
     setPendingMatch(candidateMatch);
     setPairingCode("");
@@ -127,6 +132,9 @@ export function LandingPage({
   const optionsForTeamA = teams.filter((t) => t.id !== teamBId);
   const optionsForTeamB = teams.filter((t) => t.id !== teamAId);
 
+  const renderOptionLabel = (team) =>
+    isMobile ? team.label : `${team.label} (c: ${team.captain})`;
+
   return (
     <div className="page landing-page">
       <header className="header">
@@ -150,7 +158,7 @@ export function LandingPage({
             <select value={teamAId} onChange={handleTeamAChange}>
               {optionsForTeamA.map((team) => (
                 <option key={team.id} value={team.id}>
-                  {team.label} (c: {team.captain})
+                  {renderOptionLabel(team)}
                 </option>
               ))}
             </select>
@@ -163,7 +171,7 @@ export function LandingPage({
             <select value={teamBId} onChange={handleTeamBChange}>
               {optionsForTeamB.map((team) => (
                 <option key={team.id} value={team.id}>
-                  {team.label} (c: {team.captain})
+                  {renderOptionLabel(team)}
                 </option>
               ))}
             </select>
@@ -177,11 +185,15 @@ export function LandingPage({
           </strong>
         </p>
 
-        <div className="actions-row">
+        {/* 🔁 Buttons: same size via .landing-actions */}
+        <div className="actions-row landing-actions">
           <button className="primary-btn" onClick={onStartMatch}>
             Start Match
           </button>
-          <button className="secondary-btn" onClick={onGoToStats}>
+          <button
+            className="secondary-btn"
+            onClick={() => onGoToStats()}
+          >
             View Stats
           </button>
           <button className="secondary-btn" onClick={onGoToSquads}>
@@ -193,32 +205,33 @@ export function LandingPage({
         </div>
       </section>
 
+      {/* Ribbon */}
       <section className="ticker">
         <div className="ticker-inner">
           <span>{ribbonText}</span>
         </div>
       </section>
 
-      {/* 👇 New team picture section */}
-      <section className="team-photo">
+      {/* Team photo */}
+      <section className="card team-photo-card">
         <img
-          src={TurfKingsTeam}
-          alt="Turf Kings squad"
-          className="team-photo-img"
+          src={TeamPhoto}
+          alt="Turf Kings team"
+          className="team-photo"
         />
       </section>
 
-      {/* 👇 Add this new website link button */}
-      <div className="website-link">
+      {/* Website link */}
+      <section className="card website-card">
         <a
           href="https://nkululeko-memela0205.github.io/packetcodeofficial.github.io/"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noreferrer"
           className="website-btn"
         >
           🌍 Visit Our Website
         </a>
-      </div>
+      </section>
 
       {showPairingModal && (
         <div className="modal-backdrop">
