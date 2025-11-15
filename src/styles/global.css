@@ -521,6 +521,16 @@ th {
 
 /* Mobile-specific tweaks */
 @media (max-width: 480px) {
+  /* Smaller header on phones */
+  .header h1 {
+    font-size: 1.9rem;
+    line-height: 1.1;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+  }
+
   /* Keep score row side-by-side & tighter */
   .score-row {
     justify-content: space-between;
